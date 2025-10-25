@@ -1,0 +1,830 @@
+let dragging;
+let interval;
+let armDraggingEnabled = true; // Flag to enable/disable arm dragging
+
+document.addEventListener('DOMContentLoaded', function() {
+  console.log("DOM fully loaded, initializing record player");
+  initializeRecordPlayer();
+  
+  // Setup arm dragging with vanilla JavaScript
+  setupArmDragging();
+});
+
+// Brand new arm dragging implementation
+function setupArmDragging() {
+  console.log("Setting up spatial arm dragging");
+  
+  // Elements
+  const arm = document.getElementById('arm');
+  const armHead = document.querySelector('#arm .head');
+  const armElement = document.querySelector('#arm .arm');
+  const record = document.querySelector('#record');
+  
+  if (!arm || !armHead || !record) {
+    console.error("Could not find required elements");
+    return;
+  } else {
+    console.log("Found all required elements for dragging");
+  }
+  
+  // Variables
+  let isDragging = false;
+  let lastX = 0;
+  let targetAngle = 0;  // Target angle for smooth interpolation
+  let currentAnimFrame = null; // For animation loop
+  
+  // Start dragging on mousedown
+  armHead.addEventListener('mousedown', startDrag);
+  armElement.addEventListener('mousedown', startDrag);
+  
+  // Touch support
+  armHead.addEventListener('touchstart', startDrag, { passive: false });
+  armElement.addEventListener('touchstart', startDrag, { passive: false });
+  
+  // Mouse move
+  document.addEventListener('mousemove', dragMove);
+  
+  // Touch move
+  document.addEventListener('touchmove', dragMove, { passive: false });
+  
+  // Stop dragging
+  document.addEventListener('mouseup', stopDrag);
+  document.addEventListener('touchend', stopDrag);
+  document.addEventListener('touchcancel', stopDrag);
+  
+  function startDrag(e) {
+    if (!armDraggingEnabled) return;
+    
+    e.preventDefault();
+    isDragging = true;
+    
+    // Get start position
+    lastX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+    
+    // Get current angle from CSS
+    const style = getComputedStyle(document.documentElement);
+    targetAngle = parseFloat(style.getPropertyValue('--arm-angle')) || 0;
+    
+    // Remove transition for smooth dragging
+    document.documentElement.style.setProperty('--arm-transition-duration', '0s');
+    
+    // Start animation loop for smooth movement
+    if (currentAnimFrame === null) {
+      currentAnimFrame = requestAnimationFrame(updateArmPosition);
+    }
+    
+    console.log("Arm drag started at X:", lastX);
+  }
+  
+  function dragMove(e) {
+    if (!isDragging || !armDraggingEnabled) return;
+    
+    e.preventDefault();
+    
+    // Get current X position
+    const currentX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+    
+    // Detect movement direction
+    const movingRight = currentX > lastX;
+    const movingLeft = currentX < lastX;
+    
+    // Adjust target angle based on direction
+    // Moving LEFT = lower arm (more negative angle)
+    // Moving RIGHT = raise arm (more positive angle)
+    const sensitivity = 0.3; // Increased slightly for more responsive feel
+    const changeAmount = Math.abs(currentX - lastX) * sensitivity;
+    
+    if (movingLeft) {
+      // Moving left - lower arm (more negative)
+      targetAngle = Math.max(-45, targetAngle - changeAmount);
+    } else if (movingRight) {
+      // Moving right - raise arm (more positive)
+      targetAngle = Math.min(0, targetAngle + changeAmount);
+    }
+    
+    // Visual feedback when near optimal position
+    if (Math.abs(targetAngle + 30) < 5) {
+      armHead.classList.add('on-target');
+    } else {
+      armHead.classList.remove('on-target');
+    }
+    
+    // Update last position
+    lastX = currentX;
+    
+    // Log current state
+    console.log("Dragging: direction =", movingLeft ? "left" : (movingRight ? "right" : "none"), "targetAngle =", targetAngle);
+  }
+  
+  function stopDrag() {
+    if (!isDragging) return;
+    
+    isDragging = false;
+    
+    // Get final angle equal to the target angle (since we've been updating it)
+    const finalAngle = targetAngle;
+    
+    // After a short delay to allow animation to settle
+    setTimeout(() => {
+      // Cancel the animation loop
+      if (currentAnimFrame !== null) {
+        cancelAnimationFrame(currentAnimFrame);
+        currentAnimFrame = null;
+      }
+      
+      // Update record player state
+      updatePlayerState(finalAngle);
+    }, 50);
+    
+    console.log("Arm drag ended at angle:", finalAngle);
+  }
+  
+  function updateArmPosition() {
+    // Get current angle from CSS
+    const style = getComputedStyle(document.documentElement);
+    const currentAngle = parseFloat(style.getPropertyValue('--arm-angle')) || 0;
+    
+    // Apply smooth easing to movement (interpolate current angle toward target)
+    const easing = 0.15; // Higher = smoother but slower
+    const newAngle = currentAngle + ((targetAngle - currentAngle) * easing);
+    
+    // Only update if there's a significant difference
+    if (Math.abs(newAngle - currentAngle) > 0.01) {
+      document.documentElement.style.setProperty('--arm-angle', newAngle + 'deg');
+    }
+    
+    // Continue animation loop
+    currentAnimFrame = requestAnimationFrame(updateArmPosition);
+  }
+  
+  function updatePlayerState(angle) {
+    const turntable = document.getElementById('turntable');
+    
+    if (angle <= -10) {
+      // Arm is lowered enough to play
+      turntable.classList.remove('pause');
+      turntable.classList.add('play');
+      
+      // If arm is not quite at the optimal position, adjust it with a short transition
+      if (Math.abs(angle + 30) > 5) {
+        document.documentElement.style.setProperty('--arm-transition-duration', '0.5s');
+        document.documentElement.style.setProperty('--arm-angle', '-30deg');
+      }
+      
+      // Start playback
+      console.log("Arm lowered enough, starting playback");
+      startPlayback(angle);
+    } else {
+      // Arm is raised
+      turntable.classList.remove('play');
+      turntable.classList.add('pause');
+      
+      // Pause playback
+      console.log("Arm raised, pausing playback");
+      pausePlayback();
+    }
+  }
+}
+
+function initializeRecordPlayer() {
+  // Add timer functionality variables
+  window.recordTimers = {
+    active: null,
+    timerId: null,
+    timeRemaining: 0,
+    totalTime: 0,
+    startTime: 0
+  };
+
+  document.querySelector('#power').addEventListener('click', () => {
+    let turntable = document.querySelector('#turntable');
+
+    turntable.classList.toggle('play');
+    turntable.classList.toggle('pause');
+
+    if (turntable.classList.contains('play')) {
+      // Lower arm onto the record at the optimal position
+      document.documentElement.style.setProperty('--arm-transition-duration', '1s');
+      document.documentElement.style.setProperty('--arm-angle', '-30deg');
+      
+      // Start playback
+      startPlayback();
+    } else {
+      // Raise arm back to upright position
+      document.documentElement.style.setProperty('--arm-transition-duration', '1s');
+      document.documentElement.style.setProperty('--arm-angle', '0deg');
+      
+      // Pause playback
+      pausePlayback();
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey) return;
+
+    switch(e.keyCode) {
+      case 32:
+        document.querySelector('#power').click();
+        break;
+      case 51:
+        document.querySelector('#speed33').click(); // Now 30min timer
+        break;
+      case 52:
+        document.querySelector('#speed45').click(); // Now 60min timer
+        break;
+    }
+  });
+
+  // Rename the buttons for clarity
+  const timer30Button = document.querySelector('#speed33');
+  const timer60Button = document.querySelector('#speed45');
+  
+  // Set timer displays
+  timer30Button.textContent = '30m';
+  timer60Button.textContent = '60m';
+  
+  // Add data-time attributes
+  timer30Button.setAttribute('data-time', '30 min');
+  timer60Button.setAttribute('data-time', '60 min');
+  
+  // Add timer progress bars
+  const progress30 = document.createElement('div');
+  progress30.className = 'timer-progress';
+  timer30Button.appendChild(progress30);
+  
+  const progress60 = document.createElement('div');
+  progress60.className = 'timer-progress';
+  timer60Button.appendChild(progress60);
+
+  // Update button event listeners for timer functionality
+  document.querySelectorAll('#speed .button').forEach((button) => {
+    button.addEventListener('click', (e) => {
+      // Remove active class from all buttons
+      document.querySelectorAll('#speed .button').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      
+      // Get time from the button's ID
+      const timerMinutes = e.target.id === 'speed33' ? 30 : 60;
+      const timerSeconds = timerMinutes * 60;
+      
+      // If this button was already active, just clear the timer
+      if (window.recordTimers.active === e.target.id) {
+        clearTimeout(window.recordTimers.timerId);
+        window.recordTimers.active = null;
+        window.recordTimers.timeRemaining = 0;
+        e.target.querySelector('.timer-progress').style.width = '0%';
+        return;
+      }
+      
+      // Add active class to clicked button
+      e.target.classList.add('active');
+      
+      // Set the speed attribute for animation purposes
+      const speed = e.target.id === 'speed33' ? '33' : '45';
+      document.body.setAttribute('data-speed', speed);
+      document.querySelector('#turntable').setAttribute('data-speed', speed);
+      
+      // Clear any existing timer
+      if (window.recordTimers.timerId) {
+        clearTimeout(window.recordTimers.timerId);
+      }
+      
+      // Start the timer
+      startTimer(e.target.id, timerSeconds);
+      
+      // Update the animation if playing
+      if (document.querySelector('#turntable').classList.contains('play')) {
+        let remaining = getEstimatedRemainingTime();
+        setArmAnimation(remaining);
+      }
+    }, true);
+  });
+
+  document.querySelector('#volume .slider').addEventListener('input', (e) => {
+    let volume = e.target.value;
+    console.log("Volume set to", volume);
+  });
+
+  document.querySelector('#volume .slider').value = 75;
+  
+  // No default timer selection
+}
+
+function startPlayback(armPosition) {
+  let percentage = armPosition ? calculatePercentageFromArm(armPosition) : getPercentage();
+  let head = document.querySelector('#arm .head');
+  let turntable = document.querySelector('#turntable');
+
+  head.classList.remove('pulse');
+
+  if (percentage >= -0.1 && percentage <= 1) {
+    if (turntable.classList.contains('play')) {
+      let remaining = getEstimatedRemainingTime() * (1 - percentage);
+      setArmAnimation(remaining);
+    }
+  } else if (percentage < -0.1) {
+    head.classList.add('pulse');
+  }
+}
+
+function pausePlayback() {
+  console.log("Playback paused");
+}
+
+function getEstimatedRemainingTime() {
+  if (window.recordTimers && window.recordTimers.active) {
+    return window.recordTimers.timeRemaining;
+  }
+  
+  // Fallback to previous behavior if no timer is active
+  let speed = document.body.getAttribute('data-speed');
+  if (speed === '45') {
+    return 3600; // 60 minutes in seconds
+  } else {
+    return 1800; // 30 minutes in seconds
+  }
+}
+
+function calculatePercentageFromArm(angle) {
+  return Math.abs(angle) / 45;
+}
+
+function getPercentage() {
+  try {
+    let head = document.querySelector('#arm .head');
+    let rect = head.getBoundingClientRect();
+    let scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+    let scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    let needle = {
+      x: rect.left + scrollLeft + head.offsetWidth / 2,
+      y: rect.top + scrollTop + head.offsetHeight + 10
+    }
+
+    let record = document.querySelector('#record');
+    let center = {
+      x: record.offsetLeft + record.offsetWidth / 2,
+      y: record.offsetTop + record.offsetHeight / 2
+    }
+
+    let distance = getDistance(center, needle);
+    let angle = getAngle(center, needle);
+
+    let label = document.querySelector('#label');
+    let startBuffer = 10;
+    let radiusRecord = record.offsetWidth / 2 - startBuffer;
+    let radiusLabel = label.offsetWidth / 2 + 15;
+    let percentage = ((radiusRecord - distance) / (radiusRecord - radiusLabel)) + (angle / 36000);
+
+    percentage = Math.min(percentage, 1);
+
+    return percentage;
+  } catch (error) {
+    console.log("Error calculating percentage:", error);
+    return 0;
+  }
+}
+
+function getDistance(center, needle) {
+  return Math.sqrt(Math.pow(center.x - needle.x, 2) + Math.pow(center.y - needle.y, 2));
+}
+
+function getAngle(center, needle) {
+  let record = document.querySelector('#record');
+  let rotation = getRotation(record);
+  let angle = atan2Degrees(needle.y - center.y, needle.x - center.x);
+
+  angle = angle - rotation;
+  if (angle < 0) angle += 360;
+
+  return angle;
+}
+
+function getRotation(element) {
+  let matrix = window.getComputedStyle(element, null).getPropertyValue('transform');
+
+  let values = matrix.split('(')[1];
+  values = values.split(')')[0];
+  values = values.split(',');
+
+  let a = values[0];
+  let b = values[1];
+
+  let rotation = atan2Degrees(b, a);
+
+  return rotation;
+}
+
+function atan2Degrees(y, x) {
+  let angle = Math.atan2(y, x) * (180/Math.PI);
+  if (angle < 0) angle += 360;
+
+  return angle;
+}
+
+function setRotation(angle) {
+  let root = document.documentElement;
+  root.style.setProperty('--arm-transition-duration', '0');
+  root.style.setProperty('--arm-angle', angle + 'deg'); 
+}
+
+function setArmAnimation(remaining) {
+  try {
+    let speed = document.body.getAttribute('data-speed');
+    let root = document.documentElement;
+
+    if (speed == '45') {
+      remaining *= .65;
+    }
+
+    root.style.setProperty('--arm-transition-duration', remaining + 's');
+
+    if (remaining > 0) {
+      clearInterval(interval);
+      root.style.setProperty('--arm-angle', '-45deg');
+    } else {
+      interval = setInterval(function() { setArmAnimation(0); }, 500);
+    }
+  } catch (error) {
+    console.log("Error setting arm animation:", error);
+  }
+}
+
+$(document).ready(function() {
+  let isPlaying = false;
+  let isDraggingArm = false;
+  let startX;
+  let startAngle;
+
+  const setupRecordCenter = function() {
+    const label = $('#label');
+    if (label.length) {
+      const centerImage = $('<img>', {
+        src: 'favi.png',
+        alt: 'Record center',
+        id: 'record-center-image'
+      });
+      
+      centerImage.css({
+        'position': 'absolute',
+        'top': '50%',
+        'left': '50%',
+        'transform': 'translate(-50%, -50%)',
+        'width': '30px',
+        'height': 'auto',
+        'z-index': '10'
+      });
+      
+      label.append(centerImage);
+      console.log("Added center image to record");
+    } else {
+      console.error("Could not find label element for the record");
+    }
+  };
+  
+  setupRecordCenter();
+
+  $('#volume .slider').on('input', function() {
+    let volume = $(this).val();
+    console.log("Volume set to", volume);
+  });
+  
+  $('#volume .slider').val(75);
+  
+  $('.volume-markers .marker').on('click', function() {
+    const level = $(this).attr('data-level');
+    $('#volume .slider').val(level).trigger('input');
+  });
+  
+  $('#speed33').click(function() {
+    $('#speed33').addClass('active');
+    $('#speed45').removeClass('active');
+    $('body').attr('data-speed', '33');
+    document.querySelector('#turntable').setAttribute('data-speed', '33');
+  });
+  
+  $('#speed45').click(function() {
+    $('#speed45').addClass('active');
+    $('#speed33').removeClass('active');
+    $('body').attr('data-speed', '45');
+    document.querySelector('#turntable').setAttribute('data-speed', '45');
+  });
+  
+  // DISABLE jQuery arm dragging implementation
+  // Mouse down on arm starts dragging
+  /*
+  $('#arm .head, #arm .arm').mousedown(function(e) {
+    e.preventDefault();
+    isDraggingArm = true;
+    
+    // Store initial position and angle
+    startX = e.pageX;
+    startAngle = getCurrentArmAngle();
+    
+    // Disable transition for smooth dragging
+    document.documentElement.style.setProperty('--arm-transition-duration', '0s');
+  });
+  
+  // Touch start on arm
+  $('#arm .head, #arm .arm').on('touchstart', function(e) {
+    e.preventDefault();
+    isDraggingArm = true;
+    
+    // Store initial position and angle
+    startX = e.originalEvent.touches[0].pageX;
+    startAngle = getCurrentArmAngle();
+    
+    // Disable transition for smooth dragging
+    document.documentElement.style.setProperty('--arm-transition-duration', '0s');
+  });
+  
+  // Mouse move updates arm angle
+  $(document).mousemove(function(e) {
+    if (!isDraggingArm) return;
+    
+    // Calculate horizontal movement
+    const deltaX = startX - e.pageX;
+    
+    // Convert to arm angle - positive deltaX (moving left) means lower arm
+    // Scale factor determines sensitivity
+    const newAngle = calculateArmAngle(deltaX);
+    
+    // Apply the new angle
+    setArmAngle(newAngle);
+    
+    // Visual feedback
+    updateArmTargetIndicator(newAngle);
+  });
+  
+  // Touch move updates arm angle
+  $(document).on('touchmove', function(e) {
+    if (!isDraggingArm) return;
+    e.preventDefault();
+    
+    // Calculate horizontal movement
+    const deltaX = startX - e.originalEvent.touches[0].pageX;
+    
+    // Convert to arm angle
+    const newAngle = calculateArmAngle(deltaX);
+    
+    // Apply the new angle
+    setArmAngle(newAngle);
+    
+    // Visual feedback
+    updateArmTargetIndicator(newAngle);
+  });
+  
+  // Mouse up ends dragging
+  $(document).mouseup(function() {
+    if (!isDraggingArm) return;
+    
+    // End dragging
+    isDraggingArm = false;
+    
+    // Get final angle
+    const finalAngle = getCurrentArmAngle();
+    
+    // Update play state
+    handleArmPositionChange(finalAngle);
+  });
+  
+  // Touch end ends dragging
+  $(document).on('touchend touchcancel', function() {
+    if (!isDraggingArm) return;
+    
+    // End dragging
+    isDraggingArm = false;
+    
+    // Get final angle
+    const finalAngle = getCurrentArmAngle();
+    
+    // Update play state
+    handleArmPositionChange(finalAngle);
+  });
+  */
+  
+  // Keep these helper functions for reference but they're not used anymore
+  function calculateArmAngle(deltaX) {
+    // Scaling factor - adjust for desired sensitivity
+    const scaleFactor = 0.1;
+    
+    // Calculate new angle: 
+    // - Positive deltaX (moving left) lowers the arm (more negative angle)
+    // - Negative deltaX (moving right) raises the arm (less negative angle)
+    let newAngle = startAngle - (deltaX * scaleFactor);
+    
+    // Limit to valid range: 0 (upright) to -45 (fully lowered)
+    newAngle = Math.min(0, Math.max(-45, newAngle));
+    
+    return newAngle;
+  }
+  
+  function getCurrentArmAngle() {
+    const angle = getComputedStyle(document.documentElement).getPropertyValue('--arm-angle');
+    return parseFloat(angle) || 0;
+  }
+  
+  function setArmAngle(angle) {
+    document.documentElement.style.setProperty('--arm-angle', angle + 'deg');
+  }
+  
+  function handleArmPositionChange(angle) {
+    if (angle <= -10) {
+      if (!isPlaying) {
+        isPlaying = true;
+        $('#turntable').removeClass('pause');
+        $('#turntable').addClass('play');
+        
+        // Call the global startPlayback function if available
+        if (typeof window.startPlayback === 'function') {
+          window.startPlayback(angle);
+        }
+      }
+    } else {
+      if (isPlaying) {
+        isPlaying = false;
+        $('#turntable').addClass('pause');
+        $('#turntable').removeClass('play');
+        
+        // Pause playback if needed
+        if (typeof window.pausePlayback === 'function') {
+          window.pausePlayback();
+        }
+      }
+    }
+  }
+  
+  function updateArmTargetIndicator(angle) {
+    const targetAngle = -30;
+    const tolerance = 5;
+    
+    if (Math.abs(angle - targetAngle) <= tolerance) {
+      $('#arm .head').addClass('on-target');
+    } else {
+      $('#arm .head').removeClass('on-target');
+    }
+  }
+  
+  $('#label').css('background-color', 'hsl(' + Math.floor(Math.random() * 360) + ', 70%, 80%)');
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+  const style = document.createElement('style');
+  style.textContent = `
+    /* Record center image styling */
+    #record-center-image {
+      transition: transform 0.3s ease;
+    }
+    
+    #turntable.play #record-center-image {
+      animation: spin-center 2s linear infinite;
+    }
+    
+    #arm .head.on-target {
+      box-shadow: 0 0 8px 2px rgba(255, 255, 0, 0.7);
+    }
+    
+    @keyframes spin-center {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+    
+    /* Timer button styling - reverted to circular style */
+    #speed {
+      display: flex;
+      justify-content: center;
+      margin: 10px 0;
+    }
+    
+    #speed .button {
+      width: 45px;
+      height: 45px;
+      border-radius: 50%; /* Circular buttons */
+      margin: 0 8px;
+      text-align: center;
+      line-height: 45px;
+      cursor: pointer;
+      background-color: #333;
+      color: #aaa;
+      font-weight: bold;
+      user-select: none;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      position: relative; /* For timer indicator */
+    }
+    
+    #speed .button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+    }
+    
+    #speed .button.active {
+      background-color: #555;
+      color: #fff;
+      box-shadow: 0 0 8px rgba(255,255,255,0.5);
+    }
+    
+    /* Timer display inside button */
+    #speed .button::after {
+      content: attr(data-time);
+      position: absolute;
+      bottom: -18px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 12px;
+      color: #aaa;
+    }
+    
+    /* Timer progress indicator - circular version */
+    #speed .button .timer-progress {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background-color: #ff5500;
+      width: 0%; /* Will be controlled by JS */
+      transition: width 1s linear;
+      border-radius: 0 0 50% 50%; /* Curved bottom edge */
+    }
+    
+    /* Animation speeds remain for visual effect */
+    #turntable[data-speed="33"] #record {
+      animation-duration: 1.8s;
+    }
+    
+    #turntable[data-speed="45"] #record {
+      animation-duration: 1.33s;
+    }
+    
+    #turntable.play[data-speed="33"] #record {
+      animation: spin-33 1.8s linear infinite;
+    }
+    
+    #turntable.play[data-speed="45"] #record {
+      animation: spin-45 1.33s linear infinite;
+    }
+    
+    @keyframes spin-33 {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
+    @keyframes spin-45 {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+  `;
+  document.head.appendChild(style);
+  
+  console.log("Record player styling initialized");
+});
+
+// Add timer functionality
+function startTimer(buttonId, seconds) {
+  // Set timer variables
+  window.recordTimers.active = buttonId;
+  window.recordTimers.timeRemaining = seconds;
+  window.recordTimers.totalTime = seconds;
+  window.recordTimers.startTime = Date.now();
+  
+  // Get the progress bar element
+  const progressBar = document.querySelector(`#${buttonId} .timer-progress`);
+  
+  // Update timer display immediately
+  updateTimerDisplay();
+  
+  // Set interval to update timer display
+  function updateTimerDisplay() {
+    // Calculate elapsed time
+    const elapsed = (Date.now() - window.recordTimers.startTime) / 1000;
+    const remaining = Math.max(0, window.recordTimers.totalTime - elapsed);
+    const percentage = 100 - (remaining / window.recordTimers.totalTime * 100);
+    
+    // Update progress bar
+    progressBar.style.width = `${percentage}%`;
+    
+    // If timer is done
+    if (remaining <= 0) {
+      // Reset the timer
+      clearTimeout(window.recordTimers.timerId);
+      window.recordTimers.active = null;
+      window.recordTimers.timeRemaining = 0;
+      
+      // Stop the playback
+      document.querySelector('#turntable').classList.remove('play');
+      document.querySelector('#turntable').classList.add('pause');
+      pausePlayback();
+      document.documentElement.style.setProperty('--arm-transition-duration', '1s');
+      document.documentElement.style.setProperty('--arm-angle', '0deg');
+      
+      // Reset the button
+      document.querySelector(`#${buttonId}`).classList.remove('active');
+      return;
+    }
+    
+    // Continue the timer
+    window.recordTimers.timerId = setTimeout(updateTimerDisplay, 1000);
+  }
+}

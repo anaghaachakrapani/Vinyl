@@ -1,0 +1,26 @@
+{
+  "name": "soundsforwork",
+  "version": "1.0.0",
+  "description": "A web application for work-focused audio playlists",
+  "author": "Your Name",
+  "license": "MIT",
+  "homepage": "https://yourusername.github.io/soundsforwork/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/soundsforwork.git"
+  },
+  "keywords": [
+    "music",
+    "audio",
+    "productivity",
+    "ambient",
+    "sounds",
+    "focus"
+  ],
+  "bugs": {
+    "url": "https://github.com/yourusername/soundsforwork/issues"
+  },
+  "scripts": {
+    "start": "python3 -m http.server 8000"
+  }
+} 

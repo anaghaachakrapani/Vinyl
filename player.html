@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sounds For Work - Player</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="img/favicon/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="img/favicon/favicon-16x16.png">
+  <link rel="stylesheet" href="player_style.css">
+  <link rel="stylesheet" href="range.css">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      background-image: url('img/table.jpg');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      position: relative;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    
+    /* Add a semi-transparent overlay to help the record player stand out */
+    /* body::before {
+      content: '';
+      display: block;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.3);
+      z-index: 0;
+    } */
+    
+    /* Enhance the record player appearance */
+    #record-player {
+      width: 1800px !important;
+      margin: 0 auto !important;
+      background: linear-gradient(145deg, 
+        rgba(42, 42, 42, 0.95) 0%,
+        rgba(51, 51, 51, 0.95) 15%,
+        rgba(45, 45, 45, 0.95) 30%,
+        rgba(38, 38, 38, 0.95) 45%,
+        rgba(31, 31, 31, 0.95) 60%,
+        rgba(26, 26, 26, 0.95) 75%,
+        rgba(21, 21, 21, 0.95) 90%,
+        rgba(17, 17, 17, 0.95) 100%
+      ) !important;
+      box-shadow: 
+        0 20px 60px rgba(0, 0, 0, 0.9),
+        inset 0 2px 4px rgba(255, 255, 255, 0.15),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.8) !important;
+      border: 2px solid #111 !important;
+      border-radius: 20px !important;
+      padding: 30px !important;
+      position: relative !important;
+      z-index: 1 !important;
+      backdrop-filter: blur(10px) !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+    }
+    
+    /* Add a subtle glow effect to the record player */
+    #record-player::before {
+      content: '';
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      right: -2px;
+      bottom: -2px;
+      background: linear-gradient(145deg, 
+        rgba(255, 255, 255, 0.1),
+        rgba(255, 255, 255, 0.05)
+      );
+      border-radius: 22px;
+      z-index: -1;
+      filter: blur(10px);
+    }
+    
+    /* Add a subtle inner glow */
+    #record-player::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(
+        circle at 50% 50%,
+        rgba(255, 255, 255, 0.1),
+        transparent 70%
+      );
+      border-radius: 20px;
+      pointer-events: none;
+    }
+    
+    .back-button {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background-color: rgba(0, 0, 0, 0.5);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      font-size: 20px;
+      cursor: pointer;
+      z-index: 1000;
+    }
+    .back-button:hover {
+      background-color: rgba(0, 0, 0, 0.8);
+    }
+    
+    /* Simplified controls layout */
+    #buttons {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      height: auto;
+      margin-bottom: 20px;
+    }
+    
+    #volume {
+      margin-bottom: 30px;
+    }
+    
+    #power {
+      width: 250px;
+      height: 250px;
+      margin-top: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      background: linear-gradient(145deg, #444, #222);
+      box-shadow: 
+        0 6px 10px rgba(0, 0, 0, 0.8),
+        inset 0 -3px 7px rgba(0, 0, 0, 0.5),
+        inset 0 3px 3px rgba(255, 255, 255, 0.1);
+      border: 1px solid #111;
+      color: #ddd;
+      font-size: 24px;
+      font-weight: bold;
+      text-transform: uppercase;
+      transition: all 0.2s ease;
+    }
+    
+    #power:hover {
+      background: linear-gradient(145deg, #555, #333);
+    }
+    
+    #turntable.play #power {
+      background: linear-gradient(145deg, #333, #222);
+      box-shadow: 
+        0 3px 6px rgba(0, 0, 0, 0.8),
+        inset 0 3px 7px rgba(0, 0, 0, 0.7),
+        inset 0 -2px 3px rgba(255, 255, 255, 0.1);
+      transform: translateY(3px);
+    }
+  </style>
+</head>
+<body data-speed="33">
+  <button class="back-button" onclick="window.location.href='index.html'">&larr;</button>
+  <div id="category-title" class="category-title"></div>
+  
+  <div id="record-player">
+    <div id="buttons">
+      <div id="volume">
+        <div class="volume-container">
+          <div class="volume-labels">
+            
+            <input type="range" class="slider" min="0" max="100" value="70">
+          
+          </div>
+        </div>
+      </div>
+      <div id="power" class="button">Start / Stop</div>
+    </div>
+    <div id="turntable" class="pause">
+      <div id="record">
+        <div id="record-inner">
+          <div id="label">
+            <!-- Category label will be placed here -->
+          </div>
+        </div>
+      </div>
+      <div id="shine"></div>
+      <div id="controls">
+        <div id="arm">
+          <div class="base"></div>
+          <div class="arm">
+            <div class="head"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

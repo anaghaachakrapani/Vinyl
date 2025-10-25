@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A beautiful web application for playing ambient sounds while working. Features Classical, Lo-Fi Jazz, and Nature sounds.">
+    <meta name="theme-color" content="#7B3AFF">
+    <title>Sounds For Work</title>
+    
+    <!-- Favicon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="img/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="img/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="img/favicon/favicon-16x16.png">
+    <link rel="icon" type="image/png" href="img/favicon/favicon-32x32.png">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&display=swap" rel="stylesheet">
+    
+    <!-- Animate.css -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/carousel.css">
+</head>
+<body>
+
+    <!-- 3D Carousel Section -->
+    <div class="carousel-section">
+        <div role="region" aria-label="Featured sounds carousel">
+            <div class="carousel carousel--offscreen-inert" aria-live="polite">
+                <div class="carousel__slide" tabindex="0" data-label="Classical">
+                    <div class="carousel-card">
+                        <img src="img/class_disk.png" alt="Disk" class="carousel-disk">
+                        <img src="img/classical.png" alt="Classical Music" class="carousel-image">
+                        <div class="carousel-image-reflection-wrap">
+                            <img src="img/class_ref.png" alt="Classical Music" class="carousel-image-reflection">
+                        </div>
+                    </div>
+                </div>
+                <div class="carousel__slide" tabindex="0" data-label="Lo-Fi Jazz">
+                    <div class="carousel-card">
+                        <img src="img/jazz_disk.png" alt="Disk" class="carousel-disk">
+                        <img src="img/jazz.png" alt="Lo-Fi Jazz" class="carousel-image">
+                        <div class="carousel-image-reflection-wrap">
+                            <img src="img/jazz_ref.png" alt="Lo-Fi Jazz" class="carousel-image-reflection">
+                        </div>
+                    </div>
+                </div>
+                <div class="carousel__slide" tabindex="0" data-label="Nature">
+                    <div class="carousel-card">
+                        <img src="img/nature_disk.png" alt="Disk" class="carousel-disk">
+                        <img src="img/nature.png" alt="Nature Sounds" class="carousel-image">
+                        <div class="carousel-image-reflection-wrap">
+                            <img src="img/nature_ref.png" alt="Nature Sounds" class="carousel-image-reflection">
+                        </div>
+                    </div>
+                </div>
+                <div class="carousel__slide" tabindex="0" data-label="Rain">
+                    <div class="carousel-card">
+                        <img src="img/rain_disk.png" alt="Disk" class="carousel-disk">
+                        <img src="img/rain.png" alt="Nature Sounds" class="carousel-image">
+                        <div class="carousel-image-reflection-wrap">
+                            <img src="img/rain_ref.png" alt="Nature Sounds" class="carousel-image-reflection">
+                        </div>
+                    </div>
+                </div>
+              
+            
+            </div>
+        </div>
+    </div>
+
+   
+
+    <style>
+        .category-link {
+            display: inline-block;
+            text-decoration: none;
+        }
+        
+        .category-image {
+            cursor: pointer;
+        }
+    </style>
+
+    <script>
+        // Add click handlers to carousel images
+        document.addEventListener('DOMContentLoaded', function() {
+            const carouselSlides = document.querySelectorAll('.carousel__slide');
+            
+            carouselSlides.forEach(slide => {
+                const label = slide.getAttribute('data-label');
+                const carouselCard = slide.querySelector('.carousel-card');
+                
+                if (carouselCard) {
+                    carouselCard.style.cursor = 'pointer';
+                    
+                    carouselCard.addEventListener('click', function() {
+                        let category = '';
+                        
+                        // Map labels to category names
+                        if (label === 'Classical') {
+                            category = 'classical';
+                        } else if (label === 'Lo-Fi Jazz') {
+                            category = 'lofi';
+                        } else if (label === 'Nature') {
+                            category = 'stream';
+                        } else if (label === 'Rain') {
+                            category = 'rain';
+                        }
+                        
+                        // Store category in sessionStorage and navigate
+                        if (category) {
+                            sessionStorage.setItem('selectedCategory', category);
+                            sessionStorage.setItem('autoPlay', 'true');
+                            window.location.href = 'player.html';
+                        }
+                    });
+                }
+            });
+        });
+
+        // Disk hover effect - enabled during scroll
+        const carouselCards = document.querySelectorAll('.carousel-card');
+        console.log('Found carousel cards:', carouselCards.length);
+        
+        carouselCards.forEach((card, index) => {
+            const disk = card.querySelector('.carousel-disk');
+            console.log(`Card ${index}, disk found:`, !!disk);
+            
+            if (disk) {
+                card.addEventListener('mouseenter', function() {
+                    console.log('Mouse entered card', index);
+                    // Show disk
+                    disk.style.setProperty('opacity', '1', 'important');
+                    disk.style.setProperty('visibility', 'visible', 'important');
+                });
+                
+                card.addEventListener('mouseleave', function() {
+                    console.log('Mouse left card', index);
+                    // Hide disk
+                    disk.style.setProperty('opacity', '0', 'important');
+                    disk.style.setProperty('visibility', 'hidden', 'important');
+                });
+            } else {
+                console.error(`No disk found for card ${index}`);
+            }
+        });
+    </script>
+    <script src="js/script.js"></script>
+</body>
+</html>
